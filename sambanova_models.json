@@ -1,0 +1,61 @@
+{
+  "provider": "sambanova",
+  "endpoint": "https://api.sambanova.ai/v1/chat/completions",
+  "env_key": "SAMBANOVA-API-OK",
+  "limits": {
+    "total_platform_daily_cap": 120,
+    "global_rpm": 20
+  },
+  "runtime_state": {
+    "total_requests_today": 0,
+    "current_minute_requests": 0,
+    "last_minute_timestamp": 0.0,
+    "is_revoked": false,
+    "revoked_until": 0.0,
+    "last_daily_reset": 0.0
+  },
+  "models": {
+    "deepseek_r1": {
+      "id": "DeepSeek-R1",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    },
+    "deepseek_v3": {
+      "id": "DeepSeek-V3",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    },
+    "llama_70b": {
+      "id": "Meta-Llama-3.3-70B-Instruct",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    },
+    "llama_8b": {
+      "id": "Meta-Llama-3.1-8B-Instruct",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    },
+    "gemma_31b": {
+      "id": "gemma-3-31b-it",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    },
+    "gpt_oss_120b": {
+      "id": "openai/gpt-oss-120b",
+      "rpd_limit": 20,
+      "rpm_limit": 20,
+      "used_today": 0,
+      "exhausted": false
+    }
+  }
+}
