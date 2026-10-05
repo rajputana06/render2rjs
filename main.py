@@ -133,7 +133,7 @@ def execute_groq(prompt: str, image_url: Optional[str] = None, pdf_base64: Optio
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    api_key = os.getenv("GROQ_API-UK") or os.getenv(cfg.get("env_key", "GROQ_API_OK"))
+    api_key = os.getenv("GROQ-API-CANADA") or os.getenv(cfg.get("env_key", "GROQ_API_OK"))
     if not api_key: return None
 
     is_multimodal = bool(image_url or pdf_base64)
@@ -230,7 +230,7 @@ def execute_gemini(prompt: str, image_base64: Optional[str] = None, pdf_base64: 
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    api_key = os.getenv("GEMINI-API-UK") or os.getenv(cfg.get("env_key", "GEMINI-API-OK"))
+    api_key = os.getenv("GEMINI-API-CANADA") or os.getenv(cfg.get("env_key", "GEMINI-API-OK"))
     if not api_key: return None
 
     target = None
@@ -328,7 +328,7 @@ def execute_sambanova(prompt: str, is_math: bool = False):
     if state.get("current_minute_requests", 0) >= cfg["limits"]["global_rpm"]:
         return None
 
-    api_key = os.getenv("SAMBHANOVA-API-UK") or os.getenv(cfg.get("env_key", "SAMBANOVA-API-OK"))
+    api_key = os.getenv("SANBANOWA-API-RJS") or os.getenv(cfg.get("env_key", "SAMBANOVA-API-OK"))
     if not api_key: return None
 
     models = cfg["models"]
@@ -402,7 +402,7 @@ def execute_openrouter(prompt: str, image_url: Optional[str] = None):
     if state.get("current_minute_requests", 0) >= cfg["account_limits"]["global_rpm"]:
         return None
 
-    api_key = os.getenv("OPENROUTER-API-UK") or os.getenv(cfg.get("env_key", "OPENROUTER-API-OK"))
+    api_key = os.getenv("OPENROUTER-API-CANADA") or os.getenv(cfg.get("env_key", "OPENROUTER-API-OK"))
     if not api_key: return None
 
     msgs = [{"role": "system", "content": model_cfg.get("system_instruction", "")}]
