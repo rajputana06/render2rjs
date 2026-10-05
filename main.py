@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="Jyoti AI Sovereign Cluster Engine - HF Space Tier")
+app = FastAPI(title="Jyoti AI Sovereign Cluster Engine - Render Tier")
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,12 +33,12 @@ security_bearer = HTTPBearer(auto_error=False)
 
 def verify_rjs_auth(request: Request, creds: Optional[HTTPAuthorizationCredentials] = Security(security_bearer)):
     """
-    RJS_PASSWORD सुरक्षा जाँच:
+    Render सुरक्षा जाँच:
     1. Header: 'x-rjs-password: <PASSWORD>'
     2. Header: 'Authorization: Bearer <PASSWORD>'
     """
     if not RJS_EXPECTED_PASSWORD:
-        return True  # यदि HF Space Secrets में पासवर्ड सेट नहीं है तो अनुमति दें
+        return True  # यदि Render एनवायरनमेंट में पासवर्ड सेट नहीं है तो अनुमति दें
 
     header_pass = request.headers.get("x-rjs-password")
     bearer_token = creds.credentials if creds else None
@@ -133,8 +133,7 @@ def execute_groq(prompt: str, image_url: Optional[str] = None, pdf_base64: Optio
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    # सटीक सीक्रेट नाम: GROQ_API
-    api_key = os.getenv("GROQ_API") or os.getenv("GROQ_API-UK") or os.getenv(cfg.get("env_key", "GROQ_API_OK"))
+    api_key = os.getenv("GROQ_API-UK") or os.getenv(cfg.get("env_key", "GROQ_API_OK"))
     if not api_key: return None
 
     is_multimodal = bool(image_url or pdf_base64)
@@ -220,7 +219,7 @@ def execute_groq(prompt: str, image_url: Optional[str] = None, pdf_base64: Optio
 
     return None
 
-# ================= 2. GEMINI =================
+# ================= 2. GEMINI (सटीक कोटा: Gemma 14.4K -> Lite 500 -> Flash 20) =================
 def execute_gemini(prompt: str, image_base64: Optional[str] = None, pdf_base64: Optional[str] = None, need_search: bool = False, need_map: bool = False):
     cfg = read_json("gemini")
     if not cfg: return None
@@ -231,12 +230,12 @@ def execute_gemini(prompt: str, image_base64: Optional[str] = None, pdf_base64: 
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    # सटीक सीक्रेट नाम: GEMINI_API
-    api_key = os.getenv("GEMINI_API") or os.getenv("GEMINI-API-UK") or os.getenv(cfg.get("env_key", "GEMINI-API-OK"))
+    api_key = os.getenv("GEMINI-API-UK") or os.getenv(cfg.get("env_key", "GEMINI-API-OK"))
     if not api_key: return None
 
     target = None
 
+    # प्राथमिकता क्रम:
     # 1. Gemma 4 (14.4K RPD)
     for k in ["gemma_4_31b", "gemma_4_26b"]:
         m = cfg.get("heavy_gemma_pool", {}).get(k)
@@ -316,7 +315,7 @@ def execute_sambanova(prompt: str, is_math: bool = False):
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    if state.get("total_requests_today", 0) >= cfg.get("limits", {}).get("total_platform_daily_cap", 96000):
+    if state.get("total_requests_today", 0) >= cfg["limits"]["total_platform_daily_cap"]:
         state["is_revoked"] = True
         state["revoked_until"] = now + 86400
         write_json("sambanova", cfg)
@@ -326,24 +325,23 @@ def execute_sambanova(prompt: str, is_math: bool = False):
         state["current_minute_requests"] = 0
         state["last_minute_timestamp"] = now
 
-    if state.get("current_minute_requests", 0) >= cfg.get("limits", {}).get("global_rpm", 20):
+    if state.get("current_minute_requests", 0) >= cfg["limits"]["global_rpm"]:
         return None
 
-    # सटीक सीक्रेट नाम: SANBHANOVA (M की जगह N) या SAMBHANOVA-API-UK
-    api_key = os.getenv("SANBHANOVA") or os.getenv("SAMBHANOVA") or os.getenv("SAMBHANOVA-API-UK") or os.getenv(cfg.get("env_key", "SAMBANOVA-API-OK"))
+    api_key = os.getenv("SAMBHANOVA-API-UK") or os.getenv(cfg.get("env_key", "SAMBANOVA-API-OK"))
     if not api_key: return None
 
-    models = cfg.get("models", {})
+    models = cfg["models"]
     target = None
 
     if is_math:
-        for k in ["deepseek_r1", "deepseek_v3"]:
+        for k in ["deepseek_r1", "deepseek_v3", "minimax_3"]:
             m = models.get(k)
             if m and not m["exhausted"] and m["used_today"] < m["rpd_limit"]:
                 target = m
                 break
     else:
-        for k in ["llama_70b", "llama_8b", "gemma_31b", "gpt_oss_120b"]:
+        for k in ["minimax_3", "minimax_2_7", "llama_70b", "llama_8b", "gemma_31b", "gpt_oss_120b"]:
             m = models.get(k)
             if m and not m["exhausted"] and m["used_today"] < m["rpd_limit"]:
                 target = m
@@ -384,14 +382,13 @@ def execute_openrouter(prompt: str, image_url: Optional[str] = None):
     if not cfg: return None
     cfg = check_and_reset_daily(cfg, "openrouter")
     state = cfg["runtime_state"]
-    model_cfg = cfg.get("primary_ocr_model", {})
+    model_cfg = cfg["primary_ocr_model"]
     now = time.time()
 
     if state.get("is_revoked") and now < state.get("revoked_until", 0.0):
         return None
 
-    account_limits = cfg.get("account_limits", {"total_daily_rpd": 50, "global_rpm": 20})
-    if state.get("requests_used_today", 0) >= account_limits.get("total_daily_rpd", 50):
+    if state.get("requests_used_today", 0) >= cfg["account_limits"]["total_daily_rpd"]:
         state["is_revoked"] = True
         state["revoked_until"] = now + 86400
         model_cfg["exhausted"] = True
@@ -402,11 +399,10 @@ def execute_openrouter(prompt: str, image_url: Optional[str] = None):
         state["current_minute_requests"] = 0
         state["last_minute_timestamp"] = now
 
-    if state.get("current_minute_requests", 0) >= account_limits.get("global_rpm", 20):
+    if state.get("current_minute_requests", 0) >= cfg["account_limits"]["global_rpm"]:
         return None
 
-    # सटीक सीक्रेट नाम: OENROUTER_API (P छूटा हुआ) या OPENROUTER_API
-    api_key = os.getenv("OENROUTER_API") or os.getenv("OPENROUTER_API") or os.getenv("OPENROUTER-API-UK") or os.getenv(cfg.get("env_key", "OPENROUTER-API-OK"))
+    api_key = os.getenv("OPENROUTER-API-UK") or os.getenv(cfg.get("env_key", "OPENROUTER-API-OK"))
     if not api_key: return None
 
     msgs = [{"role": "system", "content": model_cfg.get("system_instruction", "")}]
@@ -424,18 +420,18 @@ def execute_openrouter(prompt: str, image_url: Optional[str] = None):
                 "X-Title": "Jyoti OCR",
                 "Content-Type": "application/json"
             },
-            json={"model": model_cfg.get("id", "google/gemma-4-31b-it:free"), "messages": msgs},
+            json={"model": model_cfg["id"], "messages": msgs},
             timeout=30
         )
         if res.status_code == 200:
             state["requests_used_today"] += 1
             state["current_minute_requests"] += 1
-            if state["requests_used_today"] >= account_limits.get("total_daily_rpd", 50):
+            if state["requests_used_today"] >= cfg["account_limits"]["total_daily_rpd"]:
                 state["is_revoked"] = True
                 state["revoked_until"] = now + 86400
                 model_cfg["exhausted"] = True
             write_json("openrouter", cfg)
-            return {"provider": "openrouter_ocr", "model": model_cfg.get("id"), "used_today": state["requests_used_today"], "data": res.json()}
+            return {"provider": "openrouter_ocr", "model": model_cfg["id"], "used_today": state["requests_used_today"], "data": res.json()}
         elif res.status_code == 429:
             state["is_revoked"] = True
             state["revoked_until"] = now + 86400
@@ -446,7 +442,7 @@ def execute_openrouter(prompt: str, image_url: Optional[str] = None):
 
     return None
 
-# ================= 5. HF ZEROGPU (HF_API_1 से HF_API_10) =================
+# ================= 5. HF ZEROGPU (HF-API-1 से HF-API-10) =================
 def execute_hf_spaces(prompt: str):
     cfg = read_json("hf_spaces")
     if not cfg: return None
@@ -462,7 +458,7 @@ def execute_hf_spaces(prompt: str):
 
     tokens = cfg.get("tokens", [])
     if not tokens:
-        tokens = [{"id": i, "env_key": f"HF_API_{i}", "used_gpu_sec": 0.0, "exhausted": False, "cooldown_until": 0.0} for i in range(1, 11)]
+        tokens = [{"id": f"token_{i}", "env_key": f"HF-API-{i}", "used_gpu_sec": 0.0, "exhausted": False, "cooldown_until": 0.0} for i in range(1, 11)]
         cfg["tokens"] = tokens
 
     curr_idx = state.get("current_token_index", 0)
@@ -481,16 +477,15 @@ def execute_hf_spaces(prompt: str):
         write_json("hf_spaces", cfg)
         return None
 
-    # दोनों फॉर्मेट्स का सपोर्ट: HF_API_1 या HF-API-1
-    token_num = curr_idx + 1
-    api_key = os.getenv(f"HF_API_{token_num}") or os.getenv(f"HF-API-{token_num}") or os.getenv(target_token.get("env_key", ""))
+    env_name = target_token.get("env_key", f"HF-API-{curr_idx+1}")
+    api_key = os.getenv(env_name)
     if not api_key: return None
 
     t0 = time.time()
     try:
         limits = cfg.get("limits", {"max_execution_timeout": 60, "gpu_seconds_per_token": 300, "cooldown_delay_seconds": 120})
         res = requests.post(
-            cfg.get("api_endpoint", "https://api-inference.huggingface.co/models"),
+            cfg["api_endpoint"],
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={"data": [prompt]},
             timeout=limits.get("max_execution_timeout", 60)
@@ -525,13 +520,13 @@ class UnifiedChatRequest(BaseModel):
     need_map: bool = False
     is_math: bool = False
 
-# सार्वजनिक हेल्थ-चेक (Cloudflare और HF Ping के लिए खुला)
+# Render Health-Check & Public Status Dashboard (खुला रहेगा)
 @app.get("/")
 @app.get("/health")
 def get_dashboard():
     return {
         "status": "online",
-        "cluster_tier": "HF_Spaces_Router",
+        "cluster_tier": "Render_Primary",
         "groq": read_json("groq"),
         "gemini": read_json("gemini"),
         "sambanova": read_json("sambanova"),
@@ -545,7 +540,7 @@ def handle_unified_chat(req: UnifiedChatRequest, request: Request):
     # RJS_PASSWORD सुरक्षा सत्यापन
     verify_rjs_auth(request)
 
-    # 1. OCR / विज़न / PDF
+    # 1. OCR / विज़न / PDF (Qwen 3.8 27B -> Gemini Gemma/Flash OCR -> OpenRouter Gemma OCR)
     if req.image_url or req.image_base64 or req.pdf_base64:
         out = execute_groq(req.prompt, image_url=req.image_url, pdf_base64=req.pdf_base64)
         if out: return out
@@ -592,7 +587,7 @@ def handle_unified_chat(req: UnifiedChatRequest, request: Request):
 
     raise HTTPException(status_code=429, detail="CRITICAL: All 5 AI Providers exhausted their quotas and are locked for 24 hours.")
 
-# Hugging Face Spaces फिक्स्ड पोर्ट 7860
+# Render स्टार्टर पोर्ट बाइंडिंग
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    port = int(os.environ.get("PORT", 10000))[cite: 4]
+    uvicorn.run(app, host="0.0.0.0", port=port)[cite: 4]
